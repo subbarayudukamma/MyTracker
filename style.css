@@ -551,6 +551,12 @@ input[type="range"].red::-webkit-slider-runnable-track {
   font-size: 12px;
   color: var(--text2);
 }
+.entry-destination {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 4px;
+  font-weight: 500;
+}
 .entry-notes {
   font-size: 13px;
   color: var(--text2);

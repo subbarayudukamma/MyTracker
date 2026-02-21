@@ -477,11 +477,13 @@ const Mileage = {
     const date = $('trip-date').value;
     const time = $('trip-time').value;
     const miles = parseFloat($('trip-miles').value);
+    const destination = $('trip-destination').value.trim();
     const purpose = $('trip-purpose').value;
     const notes = $('trip-notes').value.trim();
 
     if (!date || !time) { showToast('Please set date and time', true); return; }
     if (!miles || miles <= 0) { showToast('Please enter miles driven', true); return; }
+    if (!destination) { showToast('Please enter a destination', true); return; }
 
     const dateTime = `${date}T${time}:00`;
 
@@ -489,12 +491,14 @@ const Mileage = {
       carId: this.selectedCarId,
       dateTime,
       miles,
+      destination,
       purpose,
       notes
     });
 
     // Reset form
     $('trip-miles').value = '';
+    $('trip-destination').value = '';
     $('trip-purpose').value = 'Business';
     $('trip-notes').value = '';
     setNow('trip-date', 'trip-time');
@@ -546,6 +550,7 @@ const Mileage = {
         </div>
         <div class="entry-miles">${formatNum(t.miles)} mi</div>
         <div class="entry-odo">Odometer: ${formatNum(odoMap[t.id])} mi</div>
+        ${t.destination ? `<div class="entry-destination">${escapeHtml(t.destination)}</div>` : ''}
         ${t.notes ? `<div class="entry-notes">${escapeHtml(t.notes)}</div>` : ''}
       </div>
     `).join('');
@@ -775,7 +780,7 @@ const DataIO = {
         let running = car.initialOdometer + priorMiles;
 
         const csv = this.toCSV(
-          ['CarID', 'Make', 'Model', 'Year', 'Date', 'Time', 'MilesDriven', 'Odometer', 'Purpose', 'Notes'],
+          ['CarID', 'Make', 'Model', 'Year', 'Date', 'Time', 'MilesDriven', 'Odometer', 'Destination', 'Purpose', 'Notes'],
           g.trips.map(t => {
             running += t.miles;
             const dt = new Date(t.dateTime);
@@ -783,7 +788,7 @@ const DataIO = {
               car.id, car.make, car.model, car.year,
               formatDateLocal(dt), formatTimeLocal(dt),
               t.miles, running.toFixed(1),
-              t.purpose, t.notes || ''
+              t.destination || '', t.purpose, t.notes || ''
             ];
           })
         );
@@ -897,6 +902,7 @@ const DataIO = {
             carId: localCarId,
             dateTime,
             miles,
+            destination: row.Destination || '',
             purpose: row.Purpose || 'Business',
             notes: row.Notes || ''
           });
