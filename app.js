@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.0.1';
 const DB_NAME = 'MyTrackerDB';
 const DB_VERSION = 1;
 
@@ -293,10 +293,11 @@ const Mileage = {
   async init() {
     await this.loadCars();
     setNow('trip-date', 'trip-time');
-    // Re-select previously selected car
-    if (this.selectedCarId) {
-      $('car-select').value = this.selectedCarId;
-      this.selectCar(this.selectedCarId);
+    // Re-select previously selected car (from memory or localStorage)
+    const savedCarId = this.selectedCarId || Number(localStorage.getItem('lastCarId'));
+    if (savedCarId) {
+      $('car-select').value = savedCarId;
+      this.selectCar(savedCarId);
     } else {
       this.showEmptyState();
     }
@@ -323,8 +324,9 @@ const Mileage = {
   },
 
   async selectCar(id) {
-    if (!id) { this.selectedCarId = null; this.showEmptyState(); return; }
+    if (!id) { this.selectedCarId = null; localStorage.removeItem('lastCarId'); this.showEmptyState(); return; }
     this.selectedCarId = Number(id);
+    localStorage.setItem('lastCarId', this.selectedCarId);
     $('mileage-empty').classList.add('hidden');
     $('car-info').classList.remove('hidden');
     $('trip-form-card').classList.remove('hidden');
