@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MyTracker">
+  <meta name="theme-color" content="#007AFF">
+  <meta name="description" content="Personal tracking app — mileage, energy, and more">
+  <title>MyTracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== Install Banner (iOS) ===== -->
+  <div id="install-banner" class="install-banner hidden">
+    <span>Install: tap <b>Share ⬆</b> then <b>"Add to Home Screen"</b></span>
+    <button onclick="dismissInstallBanner()" aria-label="Close">&times;</button>
+  </div>
+
+  <!-- ===== DASHBOARD VIEW ===== -->
+  <section id="view-dashboard" class="view active">
+    <header class="app-header">
+      <h1>MyTracker</h1>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="DataIO.triggerImport()" title="Import data">📥</button>
+        <button class="icon-btn" onclick="DataIO.exportAll()" title="Export data">📤</button>
+      </div>
+    </header>
+
+    <div class="tiles-container">
+      <h2>Your Trackers</h2>
+      <div class="tiles-grid">
+        <!-- Mileage Tile -->
+        <div class="tile" onclick="App.navigate('mileage')">
+          <div class="tile-icon mileage">🚗</div>
+          <h3>Mileage</h3>
+          <p class="tile-desc">Track business &amp; personal trips</p>
+          <div class="tile-stat" id="stat-mileage"></div>
+        </div>
+        <!-- Energy Tile -->
+        <div class="tile" onclick="App.navigate('energy')">
+          <div class="tile-icon energy">⚡</div>
+          <h3>Energy</h3>
+          <p class="tile-desc">Monitor energy, focus &amp; anxiety</p>
+          <div class="tile-stat" id="stat-energy"></div>
+        </div>
+        <!-- Add More Tile (placeholder) -->
+        <div class="tile add-tile">
+          <div class="tile-icon add">➕</div>
+          <h3>More Soon</h3>
+          <p class="tile-desc">New trackers coming in future updates</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MILEAGE VIEW ===== -->
+  <section id="view-mileage" class="view">
+    <header class="view-header">
+      <button class="back-btn" onclick="App.navigate('dashboard')">Back</button>
+      <h1>Mileage Tracker</h1>
+      <button class="header-icon-btn" onclick="Mileage.showManageCars()" title="Manage cars">⚙️</button>
+    </header>
+
+    <div class="view-body">
+      <!-- Car Selector -->
+      <div class="car-selector">
+        <select id="car-select" onchange="Mileage.selectCar(this.value)">
+          <option value="">Select a car…</option>
+        </select>
+        <button class="btn-small" onclick="Mileage.showAddCarModal()">+ Add Car</button>
+      </div>
+
+      <!-- Car Info Bar -->
+      <div id="car-info" class="car-info-bar hidden">
+        <div class="car-odo-group">
+          <div class="car-odo-label">Current Odometer</div>
+          <div>
+            <span class="car-odo-value" id="current-odo">0</span>
+            <span class="car-odo-unit">mi</span>
+          </div>
+        </div>
+        <button class="car-edit-btn" onclick="Mileage.showEditCarModal()">Edit Car</button>
+      </div>
+
+      <!-- No Car Selected State -->
+      <div id="mileage-empty" class="empty-state">
+        <div class="empty-icon">🚗</div>
+        <p>Add a car to start tracking your mileage</p>
+      </div>
+
+      <!-- Log Trip Form -->
+      <div id="trip-form-card" class="card hidden">
+        <h3>Log Trip</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="trip-date">Date</label>
+            <input type="date" id="trip-date">
+          </div>
+          <div class="form-field">
+            <label for="trip-time">Time</label>
+            <input type="time" id="trip-time">
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="trip-miles">Miles Driven</label>
+          <input type="number" id="trip-miles" inputmode="decimal" step="0.1" min="0" placeholder="0.0">
+        </div>
+        <div class="form-field">
+          <label for="trip-purpose">Purpose</label>
+          <select id="trip-purpose">
+            <option value="Business" selected>Business</option>
+            <option value="Personal">Personal</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="trip-notes">Notes</label>
+          <textarea id="trip-notes" rows="2" placeholder="Event, destination, details…"></textarea>
+        </div>
+        <button class="btn-primary" onclick="Mileage.logTrip()">Log Trip</button>
+      </div>
+
+      <!-- Trip History -->
+      <div id="trip-history" class="hidden">
+        <div class="section-header">
+          <h3>Trip History</h3>
+          <span class="text-small text-muted" id="trip-count"></span>
+        </div>
+        <div id="trip-list" class="entry-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ENERGY VIEW ===== -->
+  <section id="view-energy" class="view">
+    <header class="view-header">
+      <button class="back-btn" onclick="App.navigate('dashboard')">Back</button>
+      <h1>Energy Tracker</h1>
+      <div></div>
+    </header>
+
+    <div class="view-body">
+      <div class="card">
+        <h3>How are you feeling?</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="energy-date">Date</label>
+            <input type="date" id="energy-date">
+          </div>
+          <div class="form-field">
+            <label for="energy-time">Time</label>
+            <input type="time" id="energy-time">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>⚡ Energy</span>
+            <span class="slider-value green" id="energy-val">3</span>
+          </div>
+          <input type="range" id="energy-slider" class="green"
+                 min="0" max="5" value="3"
+                 oninput="Energy.updateSlider(this,'energy-val')">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>🎯 Focus</span>
+            <span class="slider-value blue" id="focus-val">3</span>
+          </div>
+          <input type="range" id="focus-slider" class="blue"
+                 min="0" max="5" value="3"
+                 oninput="Energy.updateSlider(this,'focus-val')">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>😴 Tired</span>
+            <span class="slider-value purple" id="tired-val">3</span>
+          </div>
+          <input type="range" id="tired-slider" class="purple"
+                 min="0" max="5" value="3"
+                 oninput="Energy.updateSlider(this,'tired-val')">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>😰 Anxiety</span>
+            <span class="slider-value red" id="anxiety-val">3</span>
+          </div>
+          <input type="range" id="anxiety-slider" class="red"
+                 min="0" max="5" value="3"
+                 oninput="Energy.updateSlider(this,'anxiety-val')">
+        </div>
+
+        <div class="form-field">
+          <label for="energy-notes">Notes (optional)</label>
+          <textarea id="energy-notes" rows="2" placeholder="How are you feeling?"></textarea>
+        </div>
+
+        <button class="btn-primary" onclick="Energy.logEntry()">Log Entry</button>
+      </div>
+
+      <!-- Energy History -->
+      <div id="energy-history">
+        <div class="section-header">
+          <h3>Recent Check-ins</h3>
+          <span class="text-small text-muted" id="energy-count"></span>
+        </div>
+        <div id="energy-list" class="entry-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MODAL ===== -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="modalOverlayClick(event)">
+    <div class="modal-sheet" id="modal-sheet">
+      <div class="modal-handle"></div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast"></div>
+
+</div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="import-input" accept=".zip" style="display:none" onchange="DataIO.handleImport(this)">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

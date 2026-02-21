@@ -1,0 +1,19 @@
+{
+  "name": "MyTracker",
+  "short_name": "MyTracker",
+  "description": "Personal tracking app — mileage, energy, and more",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#007AFF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
