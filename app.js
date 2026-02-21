@@ -5,6 +5,7 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
+const APP_VERSION = '1.0';
 const DB_NAME = 'MyTrackerDB';
 const DB_VERSION = 1;
 
@@ -213,6 +214,18 @@ const App = {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+  },
+
+  showVersion() {
+    showModal(`
+      <div class="modal-title">MyTracker</div>
+      <div class="version-info">
+        <p>Version <strong>${APP_VERSION}</strong></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    `);
   },
 
   navigate(view) {
