@@ -5,9 +5,9 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.2.0';
 const DB_NAME = 'MyTrackerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 /* ===== HELPERS ===== */
 const $ = id => document.getElementById(id);
@@ -70,6 +70,14 @@ const DB = {
         }
         if (!db.objectStoreNames.contains('energy')) {
           const s = db.createObjectStore('energy', { keyPath: 'id', autoIncrement: true });
+          s.createIndex('dateTime', 'dateTime');
+        }
+        if (!db.objectStoreNames.contains('gigs')) {
+          const s = db.createObjectStore('gigs', { keyPath: 'id', autoIncrement: true });
+          s.createIndex('dateTime', 'startDateTime');
+        }
+        if (!db.objectStoreNames.contains('expenses')) {
+          const s = db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
           s.createIndex('dateTime', 'dateTime');
         }
       };
@@ -243,6 +251,8 @@ const App = {
     if (view === 'dashboard') Dashboard.updateStats();
     else if (view === 'mileage') Mileage.init();
     else if (view === 'energy') Energy.init();
+    else if (view === 'gigs') Gigs.init();
+    else if (view === 'expenses') Expenses.init();
 
     // Scroll to top
     window.scrollTo(0, 0);
@@ -279,6 +289,34 @@ const Dashboard = {
         $('stat-energy').textContent = `${energyEntries.length} entries · Last: ${timeAgo}`;
       } else {
         $('stat-energy').textContent = 'No entries yet';
+      }
+
+      // Gig stats
+      const gigs = await DB.getAll('gigs');
+      if (gigs.length > 0) {
+        const unsettled = gigs.filter(g => !g.paymentSettled).length;
+        const undelivered = gigs.filter(g => !g.deliverablesComplete).length;
+        const parts = [`${gigs.length} gig${gigs.length !== 1 ? 's' : ''}`];
+        if (unsettled > 0) parts.push(`${unsettled} unsettled`);
+        if (undelivered > 0) parts.push(`${undelivered} undelivered`);
+        $('stat-gigs').textContent = parts.join(' · ');
+      } else {
+        $('stat-gigs').textContent = 'No gigs yet';
+      }
+
+      // Expense stats
+      const expenses = await DB.getAll('expenses');
+      if (expenses.length > 0) {
+        const thisMonth = expenses.filter(ex => {
+          const d = new Date(ex.dateTime);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const noReceipt = expenses.filter(ex => !ex.hasReceipt).length;
+        const parts = [`${expenses.length} total · ${thisMonth.length} this month`];
+        if (noReceipt > 0) parts.push(`${noReceipt} no receipt`);
+        $('stat-expenses').textContent = parts.join(' · ');
+      } else {
+        $('stat-expenses').textContent = 'No expenses yet';
       }
     } catch (e) {
       console.error('Stats error:', e);
@@ -690,6 +728,482 @@ const Energy = {
   }
 };
 
+/* ===== GIG TRACKER ===== */
+const Gigs = {
+  currentFilter: 'all',
+
+  async init() {
+    this.currentFilter = 'all';
+    this.updateFilterButtons();
+    await this.renderGigs();
+  },
+
+  calcDuration(startISO, endISO) {
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    const diffMs = end - start;
+    if (diffMs <= 0) return 0;
+    const diffMin = Math.floor(diffMs / 60000);
+    return Math.floor(diffMin / 15) * 15;
+  },
+
+  formatDuration(minutes) {
+    if (minutes <= 0) return '0 min';
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hrs === 0) return `${mins} min`;
+    if (mins === 0) return `${hrs} hr`;
+    return `${hrs} hr ${mins} min`;
+  },
+
+  _modalFormHTML(gig) {
+    const isEdit = !!gig;
+    const title = isEdit ? 'Edit Gig' : 'Add Gig';
+    const now = new Date();
+    const startDate = isEdit ? gig.startDateTime.slice(0, 10) : formatDateLocal(now);
+    const startTime = isEdit ? gig.startDateTime.slice(11, 16) : formatTimeLocal(now);
+    const endDate = isEdit ? gig.endDateTime.slice(0, 10) : formatDateLocal(now);
+    const endTime = isEdit ? gig.endDateTime.slice(11, 16) : formatTimeLocal(now);
+    const gigTitle = isEdit ? escapeHtml(gig.title) : '';
+    const invoice = isEdit ? escapeHtml(gig.invoiceNumber || '') : '';
+    const paid = isEdit && gig.paymentSettled;
+    const paidDate = isEdit && gig.paymentSettledDate ? gig.paymentSettledDate : formatDateLocal(now);
+    const delivered = isEdit && gig.deliverablesComplete;
+    const deliveredDate = isEdit && gig.deliverablesCompleteDate ? gig.deliverablesCompleteDate : formatDateLocal(now);
+    const notes = isEdit ? escapeHtml(gig.notes || '') : '';
+
+    return `
+      <div class="modal-title">${title}</div>
+      <div class="form-field">
+        <label for="gig-title">Title</label>
+        <input type="text" id="gig-title" placeholder="e.g. Website redesign" value="${gigTitle}">
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="gig-start-date">Start Date</label>
+          <input type="date" id="gig-start-date" value="${startDate}">
+        </div>
+        <div class="form-field">
+          <label for="gig-start-time">Start Time</label>
+          <input type="time" id="gig-start-time" value="${startTime}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="gig-end-date">End Date</label>
+          <input type="date" id="gig-end-date" value="${endDate}">
+        </div>
+        <div class="form-field">
+          <label for="gig-end-time">End Time</label>
+          <input type="time" id="gig-end-time" value="${endTime}">
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="gig-invoice">Invoice Number</label>
+        <input type="text" id="gig-invoice" placeholder="e.g. INV-001" value="${invoice}">
+      </div>
+      <div class="checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="gig-paid" ${paid ? 'checked' : ''} onchange="Gigs.togglePaidDate()">
+          <span>Payment Settled</span>
+        </label>
+        <input type="date" id="gig-paid-date" class="${paid ? '' : 'hidden'}" value="${paidDate}">
+      </div>
+      <div class="checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="gig-delivered" ${delivered ? 'checked' : ''} onchange="Gigs.toggleDeliveredDate()">
+          <span>All Deliverables Done</span>
+        </label>
+        <input type="date" id="gig-delivered-date" class="${delivered ? '' : 'hidden'}" value="${deliveredDate}">
+      </div>
+      <div class="form-field">
+        <label for="gig-notes">Notes</label>
+        <textarea id="gig-notes" rows="2" placeholder="Details about this gig...">${notes}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="Gigs.${isEdit ? 'updateGig(' + gig.id + ')' : 'saveGig()'}">
+          ${isEdit ? 'Save Changes' : 'Add Gig'}
+        </button>
+        ${isEdit ? `<button class="btn-danger" onclick="Gigs.deleteGig(${gig.id})">Delete Gig</button>` : ''}
+        <button class="btn-link" onclick="closeModal()">Cancel</button>
+      </div>`;
+  },
+
+  showAddModal() {
+    showModal(this._modalFormHTML(null));
+    setTimeout(() => $('gig-title') && $('gig-title').focus(), 300);
+  },
+
+  async showEditModal(id) {
+    const gig = await DB.get('gigs', id);
+    if (!gig) return;
+    showModal(this._modalFormHTML(gig));
+  },
+
+  togglePaidDate() {
+    const checked = $('gig-paid').checked;
+    const dateEl = $('gig-paid-date');
+    if (checked) {
+      dateEl.classList.remove('hidden');
+      if (!dateEl.value) dateEl.value = formatDateLocal(new Date());
+    } else {
+      dateEl.classList.add('hidden');
+    }
+  },
+
+  toggleDeliveredDate() {
+    const checked = $('gig-delivered').checked;
+    const dateEl = $('gig-delivered-date');
+    if (checked) {
+      dateEl.classList.remove('hidden');
+      if (!dateEl.value) dateEl.value = formatDateLocal(new Date());
+    } else {
+      dateEl.classList.add('hidden');
+    }
+  },
+
+  _readForm() {
+    const title = $('gig-title').value.trim();
+    const startDate = $('gig-start-date').value;
+    const startTime = $('gig-start-time').value;
+    const endDate = $('gig-end-date').value;
+    const endTime = $('gig-end-time').value;
+    const invoiceNumber = $('gig-invoice').value.trim();
+    const paymentSettled = $('gig-paid').checked;
+    const paymentSettledDate = paymentSettled ? $('gig-paid-date').value : '';
+    const deliverablesComplete = $('gig-delivered').checked;
+    const deliverablesCompleteDate = deliverablesComplete ? $('gig-delivered-date').value : '';
+    const notes = $('gig-notes').value.trim();
+
+    if (!title) { showToast('Please enter a title', true); return null; }
+    if (!startDate || !startTime) { showToast('Please set start date and time', true); return null; }
+    if (!endDate || !endTime) { showToast('Please set end date and time', true); return null; }
+
+    const startDateTime = `${startDate}T${startTime}:00`;
+    const endDateTime = `${endDate}T${endTime}:00`;
+
+    if (new Date(endDateTime) <= new Date(startDateTime)) {
+      showToast('End time must be after start time', true);
+      return null;
+    }
+
+    const totalMinutes = this.calcDuration(startDateTime, endDateTime);
+
+    return {
+      title,
+      startDateTime,
+      endDateTime,
+      totalMinutes,
+      invoiceNumber,
+      paymentSettled,
+      paymentSettledDate,
+      deliverablesComplete,
+      deliverablesCompleteDate,
+      notes
+    };
+  },
+
+  async saveGig() {
+    const data = this._readForm();
+    if (!data) return;
+    data.dateAdded = new Date().toISOString();
+    await DB.add('gigs', data);
+    closeModal();
+    await this.renderGigs();
+    showToast('Gig added!');
+  },
+
+  async updateGig(id) {
+    const data = this._readForm();
+    if (!data) return;
+    const existing = await DB.get('gigs', id);
+    await DB.put('gigs', { ...existing, ...data });
+    closeModal();
+    await this.renderGigs();
+    showToast('Gig updated!');
+  },
+
+  async deleteGig(id) {
+    const gig = await DB.get('gigs', id);
+    const ok = await showConfirm(`Delete gig <b>${escapeHtml(gig.title)}</b>?`);
+    if (!ok) return;
+    await DB.delete('gigs', id);
+    closeModal();
+    await this.renderGigs();
+    showToast('Gig deleted');
+  },
+
+  setFilter(filter) {
+    this.currentFilter = filter;
+    this.updateFilterButtons();
+    this.renderGigs();
+  },
+
+  updateFilterButtons() {
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    const btn = $('filter-' + this.currentFilter);
+    if (btn) btn.classList.add('active');
+  },
+
+  async renderGigs() {
+    let gigs = await DB.getAll('gigs');
+
+    if (this.currentFilter === 'unsettled') {
+      gigs = gigs.filter(g => !g.paymentSettled);
+    } else if (this.currentFilter === 'settled') {
+      gigs = gigs.filter(g => g.paymentSettled);
+    } else if (this.currentFilter === 'undelivered') {
+      gigs = gigs.filter(g => !g.deliverablesComplete);
+    } else if (this.currentFilter === 'delivered') {
+      gigs = gigs.filter(g => g.deliverablesComplete);
+    }
+
+    gigs.sort((a, b) => new Date(b.startDateTime) - new Date(a.startDateTime));
+
+    $('gig-count').textContent = `${gigs.length} gig${gigs.length !== 1 ? 's' : ''}`;
+
+    if (gigs.length === 0) {
+      $('gig-history').classList.add('hidden');
+      $('gigs-empty').classList.remove('hidden');
+      return;
+    }
+
+    $('gigs-empty').classList.add('hidden');
+    $('gig-history').classList.remove('hidden');
+
+    $('gig-list').innerHTML = gigs.map(g => {
+      const duration = this.formatDuration(g.totalMinutes);
+      const startD = new Date(g.startDateTime);
+      const dateStr = startD.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = startD.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const paidBadge = g.paymentSettled
+        ? '<span class="entry-badge settled">Paid</span>'
+        : '<span class="entry-badge unsettled">Unpaid</span>';
+      const delivBadge = g.deliverablesComplete
+        ? '<span class="entry-badge delivered">Delivered</span>'
+        : '<span class="entry-badge undelivered">Pending</span>';
+
+      return `
+      <div class="entry-item gig-entry" onclick="Gigs.showEditModal(${g.id})">
+        <div class="entry-header">
+          <span class="entry-date">${dateStr} · ${timeStr}</span>
+          <div class="gig-badges">${paidBadge}${delivBadge}</div>
+        </div>
+        <div class="gig-title">${escapeHtml(g.title)}</div>
+        <div class="gig-meta">
+          <span class="gig-duration">⏱ ${duration}</span>
+          ${g.invoiceNumber ? `<span class="gig-invoice">📄 ${escapeHtml(g.invoiceNumber)}</span>` : ''}
+        </div>
+        ${g.notes ? `<div class="entry-notes">${escapeHtml(g.notes)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+};
+
+/* ===== EXPENSE TRACKER ===== */
+const Expenses = {
+  currentFilter: 'all',
+
+  async init() {
+    this.currentFilter = 'all';
+    this.updateFilterButtons();
+    await this.renderExpenses();
+  },
+
+  _modalFormHTML(exp) {
+    const isEdit = !!exp;
+    const title = isEdit ? 'Edit Expense' : 'Add Expense';
+    const now = new Date();
+    const expDate = isEdit ? exp.dateTime.slice(0, 10) : formatDateLocal(now);
+    const expTime = isEdit ? exp.dateTime.slice(11, 16) : formatTimeLocal(now);
+    const category = isEdit ? exp.category : 'Business';
+    const description = isEdit ? escapeHtml(exp.description || '') : '';
+    const amount = isEdit ? (exp.amount || '') : '';
+    const payment = isEdit ? exp.paymentMode : 'Credit Card';
+    const hasReceipt = isEdit ? exp.hasReceipt : false;
+    const notes = isEdit ? escapeHtml(exp.notes || '') : '';
+
+    return `
+      <div class="modal-title">${title}</div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="exp-date">Date</label>
+          <input type="date" id="exp-date" value="${expDate}">
+        </div>
+        <div class="form-field">
+          <label for="exp-time">Time</label>
+          <input type="time" id="exp-time" value="${expTime}">
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="exp-category">Category</label>
+        <select id="exp-category">
+          <option value="Business" ${category === 'Business' ? 'selected' : ''}>Business</option>
+          <option value="Personal" ${category === 'Personal' ? 'selected' : ''}>Personal</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="exp-description">What is this expense for?</label>
+        <input type="text" id="exp-description" placeholder="e.g. Office supplies, Software license…" value="${description}">
+      </div>
+      <div class="form-field">
+        <label for="exp-amount">Amount ($)</label>
+        <input type="number" id="exp-amount" inputmode="decimal" step="0.01" min="0" placeholder="0.00" value="${amount}">
+      </div>
+      <div class="form-field">
+        <label for="exp-payment">Mode of Payment</label>
+        <select id="exp-payment">
+          <option value="Cash" ${payment === 'Cash' ? 'selected' : ''}>Cash</option>
+          <option value="Zelle" ${payment === 'Zelle' ? 'selected' : ''}>Zelle</option>
+          <option value="Credit Card" ${payment === 'Credit Card' ? 'selected' : ''}>Credit Card</option>
+          <option value="Personal Card" ${payment === 'Personal Card' ? 'selected' : ''}>Personal Card</option>
+        </select>
+      </div>
+      <div class="checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="exp-receipt" ${hasReceipt ? 'checked' : ''}>
+          <span>Has Receipt</span>
+        </label>
+      </div>
+      <div class="form-field">
+        <label for="exp-notes">Notes</label>
+        <textarea id="exp-notes" rows="2" placeholder="Additional details…">${notes}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="Expenses.${isEdit ? 'updateExpense(' + exp.id + ')' : 'saveExpense()'}">
+          ${isEdit ? 'Save Changes' : 'Add Expense'}
+        </button>
+        ${isEdit ? `<button class="btn-danger" onclick="Expenses.deleteExpense(${exp.id})">Delete Expense</button>` : ''}
+        <button class="btn-link" onclick="closeModal()">Cancel</button>
+      </div>`;
+  },
+
+  showAddModal() {
+    showModal(this._modalFormHTML(null));
+    setTimeout(() => $('exp-description') && $('exp-description').focus(), 300);
+  },
+
+  async showEditModal(id) {
+    const exp = await DB.get('expenses', id);
+    if (!exp) return;
+    showModal(this._modalFormHTML(exp));
+  },
+
+  _readForm() {
+    const date = $('exp-date').value;
+    const time = $('exp-time').value;
+    const category = $('exp-category').value;
+    const description = $('exp-description').value.trim();
+    const amount = parseFloat($('exp-amount').value) || 0;
+    const paymentMode = $('exp-payment').value;
+    const hasReceipt = $('exp-receipt').checked;
+    const notes = $('exp-notes').value.trim();
+
+    if (!date || !time) { showToast('Please set date and time', true); return null; }
+    if (!description) { showToast('Please enter what the expense is for', true); return null; }
+
+    return {
+      dateTime: `${date}T${time}:00`,
+      category,
+      description,
+      amount,
+      paymentMode,
+      hasReceipt,
+      notes
+    };
+  },
+
+  async saveExpense() {
+    const data = this._readForm();
+    if (!data) return;
+    data.dateAdded = new Date().toISOString();
+    await DB.add('expenses', data);
+    closeModal();
+    await this.renderExpenses();
+    showToast('Expense added!');
+  },
+
+  async updateExpense(id) {
+    const data = this._readForm();
+    if (!data) return;
+    const existing = await DB.get('expenses', id);
+    await DB.put('expenses', { ...existing, ...data });
+    closeModal();
+    await this.renderExpenses();
+    showToast('Expense updated!');
+  },
+
+  async deleteExpense(id) {
+    const exp = await DB.get('expenses', id);
+    const ok = await showConfirm(`Delete expense <b>${escapeHtml(exp.description)}</b>?`);
+    if (!ok) return;
+    await DB.delete('expenses', id);
+    closeModal();
+    await this.renderExpenses();
+    showToast('Expense deleted');
+  },
+
+  setFilter(filter) {
+    this.currentFilter = filter;
+    this.updateFilterButtons();
+    this.renderExpenses();
+  },
+
+  updateFilterButtons() {
+    document.querySelectorAll('#view-expenses .filter-btn').forEach(btn => btn.classList.remove('active'));
+    const btn = $('exp-filter-' + this.currentFilter);
+    if (btn) btn.classList.add('active');
+  },
+
+  async renderExpenses() {
+    let expenses = await DB.getAll('expenses');
+
+    if (this.currentFilter === 'business') {
+      expenses = expenses.filter(e => e.category === 'Business');
+    } else if (this.currentFilter === 'personal') {
+      expenses = expenses.filter(e => e.category === 'Personal');
+    } else if (this.currentFilter === 'no-receipt') {
+      expenses = expenses.filter(e => !e.hasReceipt);
+    }
+
+    expenses.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+
+    $('expense-count').textContent = `${expenses.length} expense${expenses.length !== 1 ? 's' : ''}`;
+
+    if (expenses.length === 0) {
+      $('expense-history').classList.add('hidden');
+      $('expenses-empty').classList.remove('hidden');
+      return;
+    }
+
+    $('expenses-empty').classList.add('hidden');
+    $('expense-history').classList.remove('hidden');
+
+    $('expense-list').innerHTML = expenses.map(e => {
+      const dateStr = friendlyDateTime(e.dateTime);
+      const catBadge = e.category === 'Business'
+        ? '<span class="entry-badge business">Business</span>'
+        : '<span class="entry-badge personal">Personal</span>';
+      const receiptIcon = e.hasReceipt ? '🧾' : '';
+
+      return `
+      <div class="entry-item expense-entry" onclick="Expenses.showEditModal(${e.id})">
+        <div class="entry-header">
+          <span class="entry-date">${dateStr}</span>
+          ${catBadge}
+        </div>
+        <div class="expense-desc">${escapeHtml(e.description)}</div>
+        ${e.amount ? `<div class="expense-amount">$${formatNum(e.amount, 2)}</div>` : ''}
+        <div class="expense-meta">
+          <span class="expense-payment">${e.paymentMode}</span>
+          ${receiptIcon ? `<span class="expense-receipt">${receiptIcon} Receipt</span>` : '<span class="expense-no-receipt">No receipt</span>'}
+        </div>
+        ${e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+};
+
 /* ===== IMPORT / EXPORT ===== */
 const DataIO = {
 
@@ -760,6 +1274,8 @@ const DataIO = {
       const zip = new JSZip();
       const mileageDir = zip.folder('mileage');
       const energyDir = zip.folder('energy');
+      const gigsDir = zip.folder('gigs');
+      const expensesDir = zip.folder('expenses');
 
       // Export cars
       const cars = await DB.getAll('cars');
@@ -834,6 +1350,55 @@ const DataIO = {
         energyDir.file(`energy_${year}.csv`, csv);
       }
 
+      // Export gigs
+      const allGigs = await DB.getAll('gigs');
+      if (allGigs.length > 0) {
+        allGigs.sort((a, b) => new Date(a.startDateTime) - new Date(b.startDateTime));
+        const csv = this.toCSV(
+          ['Title', 'StartDate', 'StartTime', 'EndDate', 'EndTime', 'TotalMinutes',
+           'InvoiceNumber', 'PaymentSettled', 'PaymentSettledDate',
+           'DeliverablesComplete', 'DeliverablesCompleteDate', 'Notes'],
+          allGigs.map(g => {
+            const sd = new Date(g.startDateTime);
+            const ed = new Date(g.endDateTime);
+            return [
+              g.title,
+              formatDateLocal(sd), formatTimeLocal(sd),
+              formatDateLocal(ed), formatTimeLocal(ed),
+              g.totalMinutes,
+              g.invoiceNumber || '',
+              g.paymentSettled ? 'Yes' : 'No',
+              g.paymentSettledDate || '',
+              g.deliverablesComplete ? 'Yes' : 'No',
+              g.deliverablesCompleteDate || '',
+              g.notes || ''
+            ];
+          })
+        );
+        gigsDir.file('gigs.csv', csv);
+      }
+
+      // Export expenses
+      const allExpenses = await DB.getAll('expenses');
+      if (allExpenses.length > 0) {
+        allExpenses.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+        const csv = this.toCSV(
+          ['Date', 'Time', 'Category', 'Description', 'Amount', 'PaymentMode', 'HasReceipt', 'Notes'],
+          allExpenses.map(e => {
+            const dt = new Date(e.dateTime);
+            return [
+              formatDateLocal(dt), formatTimeLocal(dt),
+              e.category, e.description,
+              e.amount || 0,
+              e.paymentMode,
+              e.hasReceipt ? 'Yes' : 'No',
+              e.notes || ''
+            ];
+          })
+        );
+        expensesDir.file('expenses.csv', csv);
+      }
+
       // Generate and download
       const blob = await zip.generateAsync({ type: 'blob' });
       const today = formatDateLocal(new Date());
@@ -863,12 +1428,14 @@ const DataIO = {
       }
 
       const zip = await JSZip.loadAsync(file);
-      let imported = { cars: 0, trips: 0, energy: 0 };
+      let imported = { cars: 0, trips: 0, energy: 0, gigs: 0, expenses: 0 };
 
       // Clear all existing data first — import is a full overwrite
       await DB.clear('trips');
       await DB.clear('energy');
       await DB.clear('cars');
+      await DB.clear('gigs');
+      await DB.clear('expenses');
 
       // 1) Import cars
       const carIdMap = {}; // exported ID -> local ID
@@ -947,11 +1514,63 @@ const DataIO = {
         }
       }
 
-      showToast(`Imported: ${imported.cars} cars, ${imported.trips} trips, ${imported.energy} energy entries`);
+      // 4) Import gigs
+      const gigsFile = zip.file(/gigs\/gigs\.csv$/i)[0];
+      if (gigsFile) {
+        const text = await gigsFile.async('text');
+        const rows = this.parseCSV(text);
+
+        for (const row of rows) {
+          const startDateTime = `${row.StartDate}T${row.StartTime}:00`;
+          const endDateTime = `${row.EndDate}T${row.EndTime}:00`;
+
+          await DB.add('gigs', {
+            title: row.Title || '',
+            startDateTime,
+            endDateTime,
+            totalMinutes: parseInt(row.TotalMinutes) || 0,
+            invoiceNumber: row.InvoiceNumber || '',
+            paymentSettled: row.PaymentSettled === 'Yes',
+            paymentSettledDate: row.PaymentSettledDate || '',
+            deliverablesComplete: row.DeliverablesComplete === 'Yes',
+            deliverablesCompleteDate: row.DeliverablesCompleteDate || '',
+            notes: row.Notes || '',
+            dateAdded: new Date().toISOString()
+          });
+          imported.gigs++;
+        }
+      }
+
+      // 5) Import expenses
+      const expensesFile = zip.file(/expenses\/expenses\.csv$/i)[0];
+      if (expensesFile) {
+        const text = await expensesFile.async('text');
+        const rows = this.parseCSV(text);
+
+        for (const row of rows) {
+          const dateTime = `${row.Date}T${row.Time}:00`;
+
+          await DB.add('expenses', {
+            dateTime,
+            category: row.Category || 'Business',
+            description: row.Description || '',
+            amount: parseFloat(row.Amount) || 0,
+            paymentMode: row.PaymentMode || 'Credit Card',
+            hasReceipt: row.HasReceipt === 'Yes',
+            notes: row.Notes || '',
+            dateAdded: new Date().toISOString()
+          });
+          imported.expenses++;
+        }
+      }
+
+      showToast(`Imported: ${imported.cars} cars, ${imported.trips} trips, ${imported.energy} energy, ${imported.gigs} gigs, ${imported.expenses} expenses`);
 
       // Refresh current view
       if (App.currentView === 'mileage') Mileage.init();
       else if (App.currentView === 'energy') Energy.init();
+      else if (App.currentView === 'gigs') Gigs.init();
+      else if (App.currentView === 'expenses') Expenses.init();
       Dashboard.updateStats();
 
     } catch (e) {

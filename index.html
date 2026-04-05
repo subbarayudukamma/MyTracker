@@ -51,6 +51,20 @@
           <p class="tile-desc">Monitor energy, focus &amp; anxiety</p>
           <div class="tile-stat" id="stat-energy"></div>
         </div>
+        <!-- Gigs Tile -->
+        <div class="tile" onclick="App.navigate('gigs')">
+          <div class="tile-icon gigs">💼</div>
+          <h3>Gigs</h3>
+          <p class="tile-desc">Track gigs, invoices &amp; deliverables</p>
+          <div class="tile-stat" id="stat-gigs"></div>
+        </div>
+        <!-- Expenses Tile -->
+        <div class="tile" onclick="App.navigate('expenses')">
+          <div class="tile-icon expenses">💳</div>
+          <h3>Expenses</h3>
+          <p class="tile-desc">Track spending &amp; receipts</p>
+          <div class="tile-stat" id="stat-expenses"></div>
+        </div>
         <!-- Add More Tile (placeholder) -->
         <div class="tile add-tile">
           <div class="tile-icon add">➕</div>
@@ -219,6 +233,75 @@
           <span class="text-small text-muted" id="energy-count"></span>
         </div>
         <div id="energy-list" class="entry-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GIGS VIEW ===== -->
+  <section id="view-gigs" class="view">
+    <header class="view-header">
+      <button class="back-btn" onclick="App.navigate('dashboard')">Back</button>
+      <h1>Gig Tracker</h1>
+      <button class="header-icon-btn" onclick="Gigs.showAddModal()" title="Add gig">➕</button>
+    </header>
+
+    <div class="view-body">
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="Gigs.setFilter('all')" id="filter-all">All</button>
+        <button class="filter-btn" onclick="Gigs.setFilter('unsettled')" id="filter-unsettled">Unsettled</button>
+        <button class="filter-btn" onclick="Gigs.setFilter('settled')" id="filter-settled">Settled</button>
+        <button class="filter-btn" onclick="Gigs.setFilter('undelivered')" id="filter-undelivered">Undelivered</button>
+        <button class="filter-btn" onclick="Gigs.setFilter('delivered')" id="filter-delivered">Delivered</button>
+      </div>
+
+      <!-- Empty State -->
+      <div id="gigs-empty" class="empty-state hidden">
+        <div class="empty-icon">💼</div>
+        <p>No gigs yet. Tap + to add your first gig.</p>
+      </div>
+
+      <!-- Gig List -->
+      <div id="gig-history">
+        <div class="section-header">
+          <h3>Gigs</h3>
+          <span class="text-small text-muted" id="gig-count"></span>
+        </div>
+        <div id="gig-list" class="entry-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== EXPENSES VIEW ===== -->
+  <section id="view-expenses" class="view">
+    <header class="view-header">
+      <button class="back-btn" onclick="App.navigate('dashboard')">Back</button>
+      <h1>Expense Tracker</h1>
+      <button class="header-icon-btn" onclick="Expenses.showAddModal()" title="Add expense">➕</button>
+    </header>
+
+    <div class="view-body">
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="Expenses.setFilter('all')" id="exp-filter-all">All</button>
+        <button class="filter-btn" onclick="Expenses.setFilter('business')" id="exp-filter-business">Business</button>
+        <button class="filter-btn" onclick="Expenses.setFilter('personal')" id="exp-filter-personal">Personal</button>
+        <button class="filter-btn" onclick="Expenses.setFilter('no-receipt')" id="exp-filter-no-receipt">No Receipt</button>
+      </div>
+
+      <!-- Empty State -->
+      <div id="expenses-empty" class="empty-state hidden">
+        <div class="empty-icon">💳</div>
+        <p>No expenses yet. Tap + to add your first expense.</p>
+      </div>
+
+      <!-- Expense List -->
+      <div id="expense-history">
+        <div class="section-header">
+          <h3>Expenses</h3>
+          <span class="text-small text-muted" id="expense-count"></span>
+        </div>
+        <div id="expense-list" class="entry-list"></div>
       </div>
     </div>
   </section>

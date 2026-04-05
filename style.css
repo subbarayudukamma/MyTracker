@@ -196,6 +196,8 @@ body {
 }
 .tile-icon.mileage { background: rgba(52,199,89,0.15); }
 .tile-icon.energy  { background: rgba(255,149,0,0.15); }
+.tile-icon.gigs    { background: rgba(90,200,250,0.15); }
+.tile-icon.expenses { background: rgba(255,204,0,0.15); }
 .tile-icon.add     { background: var(--primary-light); }
 .tile h3 {
   font-size: 15px; font-weight: 600;
@@ -747,6 +749,128 @@ input[type="range"].red::-webkit-slider-runnable-track {
   display: flex; gap: 10px;
 }
 .confirm-actions button { flex: 1; }
+
+/* ===== Filter Bar ===== */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-btn {
+  padding: 8px 12px;
+  border: 1.5px solid var(--sep);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.filter-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.filter-btn:active { opacity: 0.8; }
+
+/* ===== Checkbox Row ===== */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.checkbox-row input[type="date"] {
+  width: auto;
+  flex: 1;
+  min-width: 130px;
+}
+
+/* ===== Gig Entry ===== */
+.gig-entry { cursor: pointer; transition: transform 0.15s; }
+.gig-entry:active { transform: scale(0.98); }
+.gig-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.gig-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.gig-badges {
+  display: flex;
+  gap: 6px;
+}
+.entry-badge.settled {
+  background: rgba(52,199,89,0.12);
+  color: var(--green);
+}
+.entry-badge.unsettled {
+  background: rgba(255,59,48,0.12);
+  color: var(--red);
+}
+.entry-badge.delivered {
+  background: rgba(0,122,255,0.12);
+  color: var(--primary);
+}
+.entry-badge.undelivered {
+  background: rgba(255,149,0,0.12);
+  color: var(--orange);
+}
+
+/* ===== Expense Entry ===== */
+.expense-entry { cursor: pointer; transition: transform 0.15s; }
+.expense-entry:active { transform: scale(0.98); }
+.expense-desc {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.expense-amount {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+.expense-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.expense-no-receipt {
+  color: var(--orange);
+}
 
 /* ===== Utility ===== */
 .hidden { display: none !important; }
