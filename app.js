@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const DB_NAME = 'MyTrackerDB';
 const DB_VERSION = 3;
 
@@ -216,6 +216,7 @@ const App = {
     }
 
     checkInstallBanner();
+    TileManager.render();
     Dashboard.updateStats();
 
     // Register service worker
@@ -271,9 +272,9 @@ const Dashboard = {
         const d = new Date(t.dateTime);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       });
-      $('stat-mileage').textContent = cars.length > 0
+      $('stat-mileage') && ($('stat-mileage').textContent = cars.length > 0
         ? `${cars.length} car${cars.length > 1 ? 's' : ''} · ${thisMonth.length} trip${thisMonth.length !== 1 ? 's' : ''} this month`
-        : 'No cars added yet';
+        : 'No cars added yet');
 
       // Energy stats
       const energyEntries = await DB.getAll('energy');
@@ -286,9 +287,9 @@ const Dashboard = {
         if (diffH < 1) timeAgo = 'Just now';
         else if (diffH < 24) timeAgo = `${diffH}h ago`;
         else timeAgo = `${Math.floor(diffH / 24)}d ago`;
-        $('stat-energy').textContent = `${energyEntries.length} entries · Last: ${timeAgo}`;
+        $('stat-energy') && ($('stat-energy').textContent = `${energyEntries.length} entries · Last: ${timeAgo}`);
       } else {
-        $('stat-energy').textContent = 'No entries yet';
+        $('stat-energy') && ($('stat-energy').textContent = 'No entries yet');
       }
 
       // Gig stats
@@ -299,9 +300,9 @@ const Dashboard = {
         const parts = [`${gigs.length} gig${gigs.length !== 1 ? 's' : ''}`];
         if (unsettled > 0) parts.push(`${unsettled} unsettled`);
         if (undelivered > 0) parts.push(`${undelivered} undelivered`);
-        $('stat-gigs').textContent = parts.join(' · ');
+        $('stat-gigs') && ($('stat-gigs').textContent = parts.join(' · '));
       } else {
-        $('stat-gigs').textContent = 'No gigs yet';
+        $('stat-gigs') && ($('stat-gigs').textContent = 'No gigs yet');
       }
 
       // Expense stats
@@ -314,13 +315,99 @@ const Dashboard = {
         const noReceipt = expenses.filter(ex => !ex.hasReceipt).length;
         const parts = [`${expenses.length} total · ${thisMonth.length} this month`];
         if (noReceipt > 0) parts.push(`${noReceipt} no receipt`);
-        $('stat-expenses').textContent = parts.join(' · ');
+        $('stat-expenses') && ($('stat-expenses').textContent = parts.join(' · '));
       } else {
-        $('stat-expenses').textContent = 'No expenses yet';
+        $('stat-expenses') && ($('stat-expenses').textContent = 'No expenses yet');
       }
     } catch (e) {
       console.error('Stats error:', e);
     }
+  }
+};
+
+/* ===== TILE MANAGER ===== */
+const TileManager = {
+  TILE_DEFS: [
+    { id: 'mileage',  icon: '🚗', iconClass: 'mileage',  title: 'Mileage',       desc: 'Track business & personal trips',      statId: 'stat-mileage' },
+    { id: 'energy',   icon: '⚡', iconClass: 'energy',   title: 'Energy Levels', desc: 'Monitor energy, focus & anxiety',      statId: 'stat-energy'  },
+    { id: 'gigs',     icon: '💼', iconClass: 'gigs',     title: 'Gigs',          desc: 'Track gigs, invoices & deliverables',  statId: 'stat-gigs'    },
+    { id: 'expenses', icon: '💳', iconClass: 'expenses', title: 'Expenses',      desc: 'Track spending & receipts',            statId: 'stat-expenses'},
+  ],
+
+  STORAGE_KEY: 'hiddenTiles',
+
+  getHidden() {
+    try { return JSON.parse(localStorage.getItem(this.STORAGE_KEY)) || []; }
+    catch { return []; }
+  },
+
+  setHidden(ids) {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(ids));
+  },
+
+  render() {
+    const hidden = this.getHidden();
+    const grid = $('tiles-grid');
+    grid.innerHTML = '';
+
+    this.TILE_DEFS.forEach(t => {
+      if (hidden.includes(t.id)) return;
+      const div = document.createElement('div');
+      div.className = 'tile';
+      div.setAttribute('onclick', `App.navigate('${t.id}')`);
+      div.innerHTML = `
+        <div class="tile-icon ${t.iconClass}">${t.icon}</div>
+        <h3>${t.title}</h3>
+        <p class="tile-desc">${t.desc}</p>
+        <div class="tile-stat" id="${t.statId}"></div>
+      `;
+      grid.appendChild(div);
+    });
+
+    const customize = document.createElement('div');
+    customize.className = 'tile customize-tile';
+    customize.setAttribute('onclick', 'TileManager.showCustomizeModal()');
+    customize.innerHTML = `
+      <div class="tile-icon customize">⚙️</div>
+      <h3>Customize</h3>
+      <p class="tile-desc">Show or hide tiles</p>
+    `;
+    grid.appendChild(customize);
+  },
+
+  showCustomizeModal() {
+    const hidden = this.getHidden();
+    const rows = this.TILE_DEFS.map(t => {
+      const checked = !hidden.includes(t.id) ? 'checked' : '';
+      return `
+        <label class="tile-toggle-row">
+          <span class="tile-toggle-info">
+            <span class="tile-toggle-icon">${t.icon}</span>
+            <span>${t.title}</span>
+          </span>
+          <input type="checkbox" class="tile-toggle-cb" data-id="${t.id}" ${checked}>
+        </label>`;
+    }).join('');
+
+    showModal(`
+      <div class="modal-title">Customize Home</div>
+      <p class="modal-subtitle">Choose which tiles appear on your home screen.</p>
+      <div class="tile-toggle-list">${rows}</div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="TileManager.saveCustomize()">Done</button>
+      </div>
+    `);
+  },
+
+  saveCustomize() {
+    const hidden = [];
+    document.querySelectorAll('.tile-toggle-cb').forEach(cb => {
+      if (!cb.checked) hidden.push(cb.dataset.id);
+    });
+    this.setHidden(hidden);
+    closeModal();
+    this.render();
+    Dashboard.updateStats();
   }
 };
 

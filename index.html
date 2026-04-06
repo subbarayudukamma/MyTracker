@@ -36,42 +36,7 @@
     </header>
 
     <div class="tiles-container">
-      <div class="tiles-grid">
-        <!-- Mileage Tile -->
-        <div class="tile" onclick="App.navigate('mileage')">
-          <div class="tile-icon mileage">🚗</div>
-          <h3>Mileage</h3>
-          <p class="tile-desc">Track business &amp; personal trips</p>
-          <div class="tile-stat" id="stat-mileage"></div>
-        </div>
-        <!-- Energy Tile -->
-        <div class="tile" onclick="App.navigate('energy')">
-          <div class="tile-icon energy">⚡</div>
-          <h3>Energy Levels</h3>
-          <p class="tile-desc">Monitor energy, focus &amp; anxiety</p>
-          <div class="tile-stat" id="stat-energy"></div>
-        </div>
-        <!-- Gigs Tile -->
-        <div class="tile" onclick="App.navigate('gigs')">
-          <div class="tile-icon gigs">💼</div>
-          <h3>Gigs</h3>
-          <p class="tile-desc">Track gigs, invoices &amp; deliverables</p>
-          <div class="tile-stat" id="stat-gigs"></div>
-        </div>
-        <!-- Expenses Tile -->
-        <div class="tile" onclick="App.navigate('expenses')">
-          <div class="tile-icon expenses">💳</div>
-          <h3>Expenses</h3>
-          <p class="tile-desc">Track spending &amp; receipts</p>
-          <div class="tile-stat" id="stat-expenses"></div>
-        </div>
-        <!-- Add More Tile (placeholder) -->
-        <div class="tile add-tile">
-          <div class="tile-icon add">➕</div>
-          <h3>More Soon</h3>
-          <p class="tile-desc">New trackers coming in future updates</p>
-        </div>
-      </div>
+      <div class="tiles-grid" id="tiles-grid"></div>
     </div>
   </section>
 
