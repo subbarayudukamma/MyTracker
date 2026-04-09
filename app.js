@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const DB_NAME = 'MyTrackerDB';
 const DB_VERSION = 3;
 
@@ -1104,11 +1104,22 @@ const Expenses = {
     const expDate = isEdit ? exp.dateTime.slice(0, 10) : formatDateLocal(now);
     const expTime = isEdit ? exp.dateTime.slice(11, 16) : formatTimeLocal(now);
     const category = isEdit ? exp.category : 'Business';
+    const expenseCategory = isEdit ? (exp.expenseCategory || '') : '';
     const description = isEdit ? escapeHtml(exp.description || '') : '';
     const amount = isEdit ? (exp.amount || '') : '';
     const payment = isEdit ? exp.paymentMode : 'Credit Card';
     const hasReceipt = isEdit ? exp.hasReceipt : false;
     const notes = isEdit ? escapeHtml(exp.notes || '') : '';
+
+    const expenseCategoryOptions = [
+      'Advertising', 'Equipment', 'Supplies', 'Meals', 'Utilities', 'Other',
+      'Rent/Lease', 'Repairs', 'Car Fees', '1099 Contractors', 'Insurance',
+      'Professional Services', 'Maintenance', 'Taxes & Licenses', 'Travel'
+    ];
+    const expenseCategoryOptionsHTML = '<option value="">(none)</option>' +
+      expenseCategoryOptions.map(o =>
+        `<option value="${o}" ${expenseCategory === o ? 'selected' : ''}>${o}</option>`
+      ).join('');
 
     return `
       <div class="modal-title">${title}</div>
@@ -1128,6 +1139,10 @@ const Expenses = {
           <option value="Business" ${category === 'Business' ? 'selected' : ''}>Business</option>
           <option value="Personal" ${category === 'Personal' ? 'selected' : ''}>Personal</option>
         </select>
+      </div>
+      <div class="form-field">
+        <label for="exp-expense-category">Expense Category</label>
+        <select id="exp-expense-category">${expenseCategoryOptionsHTML}</select>
       </div>
       <div class="form-field">
         <label for="exp-description">What is this expense for?</label>
@@ -1180,6 +1195,7 @@ const Expenses = {
     const date = $('exp-date').value;
     const time = $('exp-time').value;
     const category = $('exp-category').value;
+    const expenseCategory = $('exp-expense-category').value;
     const description = $('exp-description').value.trim();
     const amount = parseFloat($('exp-amount').value) || 0;
     const paymentMode = $('exp-payment').value;
@@ -1192,6 +1208,7 @@ const Expenses = {
     return {
       dateTime: `${date}T${time}:00`,
       category,
+      expenseCategory,
       description,
       amount,
       paymentMode,
@@ -1271,6 +1288,9 @@ const Expenses = {
       const catBadge = e.category === 'Business'
         ? '<span class="entry-badge business">Business</span>'
         : '<span class="entry-badge personal">Personal</span>';
+      const expCatBadge = e.expenseCategory
+        ? `<span class="entry-badge expense-cat">${escapeHtml(e.expenseCategory)}</span>`
+        : '';
       const receiptIcon = e.hasReceipt ? '🧾' : '';
 
       return `
@@ -1278,6 +1298,7 @@ const Expenses = {
         <div class="entry-header">
           <span class="entry-date">${dateStr}</span>
           ${catBadge}
+          ${expCatBadge}
         </div>
         <div class="expense-desc">${escapeHtml(e.description)}</div>
         ${e.amount ? `<div class="expense-amount">$${formatNum(e.amount, 2)}</div>` : ''}
@@ -1470,12 +1491,13 @@ const DataIO = {
       if (allExpenses.length > 0) {
         allExpenses.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
         const csv = this.toCSV(
-          ['Date', 'Time', 'Category', 'Description', 'Amount', 'PaymentMode', 'HasReceipt', 'Notes'],
+          ['Date', 'Time', 'Category', 'ExpenseCategory', 'Description', 'Amount', 'PaymentMode', 'HasReceipt', 'Notes'],
           allExpenses.map(e => {
             const dt = new Date(e.dateTime);
             return [
               formatDateLocal(dt), formatTimeLocal(dt),
-              e.category, e.description,
+              e.category, e.expenseCategory || '',
+              e.description,
               e.amount || 0,
               e.paymentMode,
               e.hasReceipt ? 'Yes' : 'No',
@@ -1640,6 +1662,7 @@ const DataIO = {
           await DB.add('expenses', {
             dateTime,
             category: row.Category || 'Business',
+            expenseCategory: row.ExpenseCategory || '',
             description: row.Description || '',
             amount: parseFloat(row.Amount) || 0,
             paymentMode: row.PaymentMode || 'Credit Card',
