@@ -902,6 +902,11 @@ input[type="range"].red::-webkit-slider-runnable-track {
 /* ===== Expense Entry ===== */
 .expense-entry { cursor: pointer; transition: transform 0.15s; }
 .expense-entry:active { transform: scale(0.98); }
+.expense-merchant {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
 .expense-desc {
   font-size: 16px;
   font-weight: 600;

@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const DB_NAME = 'MyTrackerDB';
 const DB_VERSION = 3;
 
@@ -1105,6 +1105,7 @@ const Expenses = {
     const expTime = isEdit ? exp.dateTime.slice(11, 16) : formatTimeLocal(now);
     const category = isEdit ? exp.category : 'Business';
     const expenseCategory = isEdit ? (exp.expenseCategory || '') : '';
+    const merchant = isEdit ? escapeHtml(exp.merchant || '') : '';
     const description = isEdit ? escapeHtml(exp.description || '') : '';
     const amount = isEdit ? (exp.amount || '') : '';
     const payment = isEdit ? exp.paymentMode : 'Credit Card';
@@ -1143,6 +1144,21 @@ const Expenses = {
       <div class="form-field">
         <label for="exp-expense-category">Expense Category</label>
         <select id="exp-expense-category">${expenseCategoryOptionsHTML}</select>
+      </div>
+      <div class="form-field">
+        <label for="exp-merchant">Merchant</label>
+        <input type="text" id="exp-merchant" list="merchant-list" placeholder="Select or type a merchant…" value="${merchant}">
+        <datalist id="merchant-list">
+          <option value="Amazon">
+          <option value="Kenmore Camera">
+          <option value="B&amp;H">
+          <option value="Adorama">
+          <option value="Cardinal Camera">
+          <option value="Home Depot">
+          <option value="Dollar Tree">
+          <option value="QFC">
+          <option value="Costco">
+        </datalist>
       </div>
       <div class="form-field">
         <label for="exp-description">What is this expense for?</label>
@@ -1196,6 +1212,7 @@ const Expenses = {
     const time = $('exp-time').value;
     const category = $('exp-category').value;
     const expenseCategory = $('exp-expense-category').value;
+    const merchant = $('exp-merchant').value.trim();
     const description = $('exp-description').value.trim();
     const amount = parseFloat($('exp-amount').value) || 0;
     const paymentMode = $('exp-payment').value;
@@ -1209,6 +1226,7 @@ const Expenses = {
       dateTime: `${date}T${time}:00`,
       category,
       expenseCategory,
+      merchant,
       description,
       amount,
       paymentMode,
@@ -1300,6 +1318,7 @@ const Expenses = {
           ${catBadge}
           ${expCatBadge}
         </div>
+        ${e.merchant ? `<div class="expense-merchant">${escapeHtml(e.merchant)}</div>` : ''}
         <div class="expense-desc">${escapeHtml(e.description)}</div>
         ${e.amount ? `<div class="expense-amount">$${formatNum(e.amount, 2)}</div>` : ''}
         <div class="expense-meta">
@@ -1491,12 +1510,13 @@ const DataIO = {
       if (allExpenses.length > 0) {
         allExpenses.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
         const csv = this.toCSV(
-          ['Date', 'Time', 'Category', 'ExpenseCategory', 'Description', 'Amount', 'PaymentMode', 'HasReceipt', 'Notes'],
+          ['Date', 'Time', 'Category', 'ExpenseCategory', 'Merchant', 'Description', 'Amount', 'PaymentMode', 'HasReceipt', 'Notes'],
           allExpenses.map(e => {
             const dt = new Date(e.dateTime);
             return [
               formatDateLocal(dt), formatTimeLocal(dt),
               e.category, e.expenseCategory || '',
+              e.merchant || '',
               e.description,
               e.amount || 0,
               e.paymentMode,
@@ -1663,6 +1683,7 @@ const DataIO = {
             dateTime,
             category: row.Category || 'Business',
             expenseCategory: row.ExpenseCategory || '',
+            merchant: row.Merchant || '',
             description: row.Description || '',
             amount: parseFloat(row.Amount) || 0,
             paymentMode: row.PaymentMode || 'Credit Card',
