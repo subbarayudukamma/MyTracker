@@ -198,6 +198,7 @@ body {
 .tile-icon.energy  { background: rgba(255,149,0,0.15); }
 .tile-icon.gigs    { background: rgba(90,200,250,0.15); }
 .tile-icon.expenses { background: rgba(255,204,0,0.15); }
+.tile-icon.india-expenses { background: rgba(255,59,48,0.15); }
 .tile-icon.add     { background: var(--primary-light); }
 .tile h3 {
   font-size: 15px; font-weight: 600;

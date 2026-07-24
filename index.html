@@ -271,6 +271,32 @@
     </div>
   </section>
 
+  <!-- ===== INDIA EXPENSES VIEW ===== -->
+  <section id="view-india-expenses" class="view">
+    <header class="view-header">
+      <button class="back-btn" onclick="App.navigate('dashboard')">Back</button>
+      <h1>India Expenses</h1>
+      <button class="header-icon-btn" onclick="IndiaExpenses.showAddModal()" title="Add India expense">➕</button>
+    </header>
+
+    <div class="view-body">
+      <!-- Empty State -->
+      <div id="india-expenses-empty" class="empty-state hidden">
+        <div class="empty-icon">🛍️</div>
+        <p>No India expenses yet. Tap + to add your first one.</p>
+      </div>
+
+      <!-- India Expense List -->
+      <div id="india-expense-history">
+        <div class="section-header">
+          <h3>Purchases</h3>
+          <span class="text-small text-muted" id="india-expense-count"></span>
+        </div>
+        <div id="india-expense-list" class="entry-list"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== MODAL ===== -->
   <div id="modal-overlay" class="modal-overlay hidden" onclick="modalOverlayClick(event)">
     <div class="modal-sheet" id="modal-sheet">

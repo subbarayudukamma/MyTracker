@@ -5,9 +5,9 @@
    ============================================================ */
 
 /* ===== CONSTANTS ===== */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const DB_NAME = 'MyTrackerDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 /* ===== HELPERS ===== */
 const $ = id => document.getElementById(id);
@@ -38,6 +38,15 @@ function formatNum(n, decimals = 1) {
   return Number(n).toLocaleString('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
+  });
+}
+
+function formatCurrencyINR(amount) {
+  return Number(amount || 0).toLocaleString('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   });
 }
 
@@ -79,6 +88,10 @@ const DB = {
         if (!db.objectStoreNames.contains('expenses')) {
           const s = db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
           s.createIndex('dateTime', 'dateTime');
+        }
+        if (!db.objectStoreNames.contains('indiaExpenses')) {
+          const s = db.createObjectStore('indiaExpenses', { keyPath: 'id', autoIncrement: true });
+          s.createIndex('purchaseDate', 'purchaseDate');
         }
       };
 
@@ -254,6 +267,7 @@ const App = {
     else if (view === 'energy') Energy.init();
     else if (view === 'gigs') Gigs.init();
     else if (view === 'expenses') Expenses.init();
+    else if (view === 'india-expenses') IndiaExpenses.init();
 
     // Scroll to top
     window.scrollTo(0, 0);
@@ -319,6 +333,21 @@ const Dashboard = {
       } else {
         $('stat-expenses') && ($('stat-expenses').textContent = 'No expenses yet');
       }
+
+      // India expense stats
+      const indiaExpenses = await DB.getAll('indiaExpenses');
+      if (indiaExpenses.length > 0) {
+        const thisMonthIndia = indiaExpenses.filter(ex => {
+          const d = new Date(ex.purchaseDate);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const monthTotal = thisMonthIndia.reduce((sum, ex) => sum + Number(ex.totalAmount || 0), 0);
+        $('stat-india-expenses') && (
+          $('stat-india-expenses').textContent = `${indiaExpenses.length} total · ${thisMonthIndia.length} this month · ${formatCurrencyINR(monthTotal)}`
+        );
+      } else {
+        $('stat-india-expenses') && ($('stat-india-expenses').textContent = 'No entries yet');
+      }
     } catch (e) {
       console.error('Stats error:', e);
     }
@@ -332,6 +361,7 @@ const TileManager = {
     { id: 'energy',   icon: '⚡', iconClass: 'energy',   title: 'Energy Levels', desc: 'Monitor energy, focus & anxiety',      statId: 'stat-energy'  },
     { id: 'gigs',     icon: '💼', iconClass: 'gigs',     title: 'Gigs',          desc: 'Track gigs, invoices & deliverables',  statId: 'stat-gigs'    },
     { id: 'expenses', icon: '💳', iconClass: 'expenses', title: 'Expenses',      desc: 'Track spending & receipts',            statId: 'stat-expenses'},
+    { id: 'india-expenses', icon: '🛍️', iconClass: 'india-expenses', title: 'India Expenses', desc: 'Track purchases and quantities', statId: 'stat-india-expenses' },
   ],
 
   STORAGE_KEY: 'hiddenTiles',
@@ -1331,6 +1361,176 @@ const Expenses = {
   }
 };
 
+/* ===== INDIA EXPENSE TRACKER ===== */
+const IndiaExpenses = {
+  async init() {
+    await this.renderEntries();
+  },
+
+  _modalFormHTML(entry) {
+    const isEdit = !!entry;
+    const title = isEdit ? 'Edit India Expense' : 'Add India Expense';
+    const now = new Date();
+    const purchaseDate = isEdit ? entry.purchaseDate : formatDateLocal(now);
+    const itemName = isEdit ? escapeHtml(entry.itemName || '') : '';
+    const unitPrice = isEdit ? (entry.unitPrice ?? '') : '';
+    const quantity = isEdit ? (entry.quantity ?? 1) : 1;
+    const boughtFor = isEdit ? escapeHtml(entry.boughtFor || '') : '';
+    const boughtWhere = isEdit ? escapeHtml(entry.boughtWhere || '') : '';
+    const notes = isEdit ? escapeHtml(entry.notes || '') : '';
+
+    return `
+      <div class="modal-title">${title}</div>
+      <div class="form-field">
+        <label for="ie-date">When</label>
+        <input type="date" id="ie-date" value="${purchaseDate}">
+      </div>
+      <div class="form-field">
+        <label for="ie-item">What was bought</label>
+        <input type="text" id="ie-item" placeholder="e.g. Mangoes" value="${itemName}">
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="ie-unit-price">How much per item (INR)</label>
+          <input type="number" id="ie-unit-price" inputmode="decimal" step="0.01" min="0" placeholder="0.00" value="${unitPrice}">
+        </div>
+        <div class="form-field">
+          <label for="ie-qty">How many items</label>
+          <input type="number" id="ie-qty" inputmode="numeric" step="1" min="1" placeholder="1" value="${quantity}">
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="ie-for">Bought for what</label>
+        <input type="text" id="ie-for" placeholder="e.g. Family dinner" value="${boughtFor}">
+      </div>
+      <div class="form-field">
+        <label for="ie-where">Bought where</label>
+        <input type="text" id="ie-where" placeholder="e.g. Local market" value="${boughtWhere}">
+      </div>
+      <div class="form-field">
+        <label for="ie-notes">Notes</label>
+        <textarea id="ie-notes" rows="2" placeholder="Additional details...">${notes}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="IndiaExpenses.${isEdit ? 'updateEntry(' + entry.id + ')' : 'saveEntry()'}">
+          ${isEdit ? 'Save Changes' : 'Add Expense'}
+        </button>
+        ${isEdit ? `<button class="btn-danger" onclick="IndiaExpenses.deleteEntry(${entry.id})">Delete Expense</button>` : ''}
+        <button class="btn-link" onclick="closeModal()">Cancel</button>
+      </div>`;
+  },
+
+  showAddModal() {
+    showModal(this._modalFormHTML(null));
+    setTimeout(() => $('ie-item') && $('ie-item').focus(), 300);
+  },
+
+  async showEditModal(id) {
+    const entry = await DB.get('indiaExpenses', id);
+    if (!entry) return;
+    showModal(this._modalFormHTML(entry));
+  },
+
+  _readForm() {
+    const purchaseDate = $('ie-date').value;
+    const itemName = $('ie-item').value.trim();
+    const unitPrice = parseFloat($('ie-unit-price').value);
+    const quantity = parseInt($('ie-qty').value);
+    const boughtFor = $('ie-for').value.trim();
+    const boughtWhere = $('ie-where').value.trim();
+    const notes = $('ie-notes').value.trim();
+
+    if (!purchaseDate) { showToast('Please set the date', true); return null; }
+    if (!itemName) { showToast('Please enter what was bought', true); return null; }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) { showToast('Please enter a valid per-item amount', true); return null; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { showToast('Please enter a valid item quantity', true); return null; }
+
+    return {
+      purchaseDate,
+      itemName,
+      unitPrice,
+      quantity,
+      totalAmount: Number((unitPrice * quantity).toFixed(2)),
+      boughtFor,
+      boughtWhere,
+      notes
+    };
+  },
+
+  async saveEntry() {
+    const data = this._readForm();
+    if (!data) return;
+    data.dateAdded = new Date().toISOString();
+    await DB.add('indiaExpenses', data);
+    closeModal();
+    await this.renderEntries();
+    showToast('India expense added!');
+  },
+
+  async updateEntry(id) {
+    const data = this._readForm();
+    if (!data) return;
+    const existing = await DB.get('indiaExpenses', id);
+    await DB.put('indiaExpenses', { ...existing, ...data });
+    closeModal();
+    await this.renderEntries();
+    showToast('India expense updated!');
+  },
+
+  async deleteEntry(id) {
+    const entry = await DB.get('indiaExpenses', id);
+    const ok = await showConfirm(`Delete expense <b>${escapeHtml(entry.itemName)}</b>?`);
+    if (!ok) return;
+    await DB.delete('indiaExpenses', id);
+    closeModal();
+    await this.renderEntries();
+    showToast('India expense deleted');
+  },
+
+  async renderEntries() {
+    const entries = await DB.getAll('indiaExpenses');
+    entries.sort((a, b) => {
+      const dateDiff = new Date(b.purchaseDate) - new Date(a.purchaseDate);
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0);
+    });
+
+    $('india-expense-count').textContent = `${entries.length} entr${entries.length !== 1 ? 'ies' : 'y'}`;
+
+    if (entries.length === 0) {
+      $('india-expense-history').classList.add('hidden');
+      $('india-expenses-empty').classList.remove('hidden');
+      Dashboard.updateStats();
+      return;
+    }
+
+    $('india-expenses-empty').classList.add('hidden');
+    $('india-expense-history').classList.remove('hidden');
+
+    $('india-expense-list').innerHTML = entries.map(e => {
+      const dateObj = new Date(`${e.purchaseDate}T00:00:00`);
+      const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `
+      <div class="entry-item expense-entry" onclick="IndiaExpenses.showEditModal(${e.id})">
+        <div class="entry-header">
+          <span class="entry-date">${dateStr}</span>
+          <span class="entry-badge expense-cat">Qty ${e.quantity}</span>
+        </div>
+        <div class="expense-desc">${escapeHtml(e.itemName)}</div>
+        <div class="expense-meta">
+          <span>Per item: ${formatCurrencyINR(e.unitPrice)}</span>
+          <span>Total: ${formatCurrencyINR(e.totalAmount)}</span>
+        </div>
+        ${e.boughtFor ? `<div class="expense-merchant">For: ${escapeHtml(e.boughtFor)}</div>` : ''}
+        ${e.boughtWhere ? `<div class="expense-merchant">Where: ${escapeHtml(e.boughtWhere)}</div>` : ''}
+        ${e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    Dashboard.updateStats();
+  }
+};
+
 /* ===== IMPORT / EXPORT ===== */
 const DataIO = {
 
@@ -1403,6 +1603,7 @@ const DataIO = {
       const energyDir = zip.folder('energy');
       const gigsDir = zip.folder('gigs');
       const expensesDir = zip.folder('expenses');
+      const indiaExpensesDir = zip.folder('india-expenses');
 
       // Export cars
       const cars = await DB.getAll('cars');
@@ -1528,6 +1729,26 @@ const DataIO = {
         expensesDir.file('expenses.csv', csv);
       }
 
+      // Export India expenses
+      const allIndiaExpenses = await DB.getAll('indiaExpenses');
+      if (allIndiaExpenses.length > 0) {
+        allIndiaExpenses.sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
+        const csv = this.toCSV(
+          ['Date', 'Item', 'UnitPrice', 'Quantity', 'TotalAmount', 'BoughtFor', 'BoughtWhere', 'Notes'],
+          allIndiaExpenses.map(e => [
+            e.purchaseDate,
+            e.itemName,
+            e.unitPrice,
+            e.quantity,
+            e.totalAmount,
+            e.boughtFor || '',
+            e.boughtWhere || '',
+            e.notes || ''
+          ])
+        );
+        indiaExpensesDir.file('india-expenses.csv', csv);
+      }
+
       // Generate and download
       const blob = await zip.generateAsync({ type: 'blob' });
       const today = formatDateLocal(new Date());
@@ -1557,7 +1778,7 @@ const DataIO = {
       }
 
       const zip = await JSZip.loadAsync(file);
-      let imported = { cars: 0, trips: 0, energy: 0, gigs: 0, expenses: 0 };
+      let imported = { cars: 0, trips: 0, energy: 0, gigs: 0, expenses: 0, indiaExpenses: 0 };
 
       // Clear all existing data first — import is a full overwrite
       await DB.clear('trips');
@@ -1565,6 +1786,7 @@ const DataIO = {
       await DB.clear('cars');
       await DB.clear('gigs');
       await DB.clear('expenses');
+      await DB.clear('indiaExpenses');
 
       // 1) Import cars
       const carIdMap = {}; // exported ID -> local ID
@@ -1695,13 +1917,43 @@ const DataIO = {
         }
       }
 
-      showToast(`Imported: ${imported.cars} cars, ${imported.trips} trips, ${imported.energy} energy, ${imported.gigs} gigs, ${imported.expenses} expenses`);
+      // 6) Import India expenses
+      const indiaExpensesFile = zip.file(/india-expenses\/india-expenses\.csv$/i)[0];
+      if (indiaExpensesFile) {
+        const text = await indiaExpensesFile.async('text');
+        const rows = this.parseCSV(text);
+
+        for (const row of rows) {
+          const quantity = parseInt(row.Quantity);
+          const unitPrice = parseFloat(row.UnitPrice);
+          const totalFromCsv = parseFloat(row.TotalAmount);
+          const totalAmount = Number.isFinite(totalFromCsv)
+            ? totalFromCsv
+            : ((Number.isFinite(unitPrice) ? unitPrice : 0) * (Number.isFinite(quantity) ? quantity : 0));
+
+          await DB.add('indiaExpenses', {
+            purchaseDate: row.Date || formatDateLocal(new Date()),
+            itemName: row.Item || '',
+            unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+            quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+            totalAmount: Number(totalAmount.toFixed(2)),
+            boughtFor: row.BoughtFor || '',
+            boughtWhere: row.BoughtWhere || '',
+            notes: row.Notes || '',
+            dateAdded: new Date().toISOString()
+          });
+          imported.indiaExpenses++;
+        }
+      }
+
+      showToast(`Imported: ${imported.cars} cars, ${imported.trips} trips, ${imported.energy} energy, ${imported.gigs} gigs, ${imported.expenses} expenses, ${imported.indiaExpenses} India expenses`);
 
       // Refresh current view
       if (App.currentView === 'mileage') Mileage.init();
       else if (App.currentView === 'energy') Energy.init();
       else if (App.currentView === 'gigs') Gigs.init();
       else if (App.currentView === 'expenses') Expenses.init();
+      else if (App.currentView === 'india-expenses') IndiaExpenses.init();
       Dashboard.updateStats();
 
     } catch (e) {

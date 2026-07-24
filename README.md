@@ -8,6 +8,7 @@ A Progressive Web App (PWA) for personal tracking — mileage, energy, gigs, exp
 - **Energy Tracker** — Track energy, focus, tiredness, and anxiety levels with sliders
 - **Gig Tracker** — Track gigs with start/end times (rounded to 15-min increments), invoice numbers, payment settlement status, and deliverable completion
 - **Expense Tracker** — Log expenses with amount, category (Business/Personal), payment mode (Cash/Zelle/Credit Card/Personal Card), and receipt tracking
+- **India Expenses Tracker** — Track purchases with item, per-item cost, quantity, purpose, place purchased, and date
 - **Offline-ready** — Service worker caches everything for offline use
 - **Persistent storage** — IndexedDB stores all data locally
 - **Export/Import** — Export all data to CSV files in a ZIP; import back from the same ZIP format
@@ -66,6 +67,8 @@ MyTracker/
     gigs.csv                    — All gig entries
   expenses/
     expenses.csv                — All expense entries
+  india-expenses/
+    india-expenses.csv          — India expense entries
   ```
 - Save this ZIP to OneDrive for backup
 
@@ -85,6 +88,8 @@ MyTracker/
 **gigs.csv**: `Title, StartDate, StartTime, EndDate, EndTime, TotalMinutes, InvoiceNumber, PaymentSettled, PaymentSettledDate, DeliverablesComplete, DeliverablesCompleteDate, Notes`
 
 **expenses.csv**: `Date, Time, Category, Description, Amount, PaymentMode, HasReceipt, Notes`
+
+**india-expenses.csv**: `Date, Item, UnitPrice, Quantity, TotalAmount, BoughtFor, BoughtWhere, Notes`
 
 ## Roadmap
 
