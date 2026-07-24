@@ -41,10 +41,10 @@ function formatNum(n, decimals = 1) {
   });
 }
 
-function formatCurrencyINR(amount) {
-  return Number(amount || 0).toLocaleString('en-IN', {
+function formatCurrencyUSD(amount) {
+  return Number(amount || 0).toLocaleString('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -343,7 +343,7 @@ const Dashboard = {
         });
         const monthTotal = thisMonthIndia.reduce((sum, ex) => sum + Number(ex.totalAmount || 0), 0);
         $('stat-india-expenses') && (
-          $('stat-india-expenses').textContent = `${indiaExpenses.length} total · ${thisMonthIndia.length} this month · ${formatCurrencyINR(monthTotal)}`
+          $('stat-india-expenses').textContent = `${indiaExpenses.length} total · ${thisMonthIndia.length} this month · ${formatCurrencyUSD(monthTotal)}`
         );
       } else {
         $('stat-india-expenses') && ($('stat-india-expenses').textContent = 'No entries yet');
@@ -1391,7 +1391,7 @@ const IndiaExpenses = {
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label for="ie-unit-price">How much per item (INR)</label>
+          <label for="ie-unit-price">How much per item (USD)</label>
           <input type="number" id="ie-unit-price" inputmode="decimal" step="0.01" min="0" placeholder="0.00" value="${unitPrice}">
         </div>
         <div class="form-field">
@@ -1518,8 +1518,8 @@ const IndiaExpenses = {
         </div>
         <div class="expense-desc">${escapeHtml(e.itemName)}</div>
         <div class="expense-meta">
-          <span>Per item: ${formatCurrencyINR(e.unitPrice)}</span>
-          <span>Total: ${formatCurrencyINR(e.totalAmount)}</span>
+          <span>Per item: ${formatCurrencyUSD(e.unitPrice)}</span>
+          <span>Total: ${formatCurrencyUSD(e.totalAmount)}</span>
         </div>
         ${e.boughtFor ? `<div class="expense-merchant">For: ${escapeHtml(e.boughtFor)}</div>` : ''}
         ${e.boughtWhere ? `<div class="expense-merchant">Where: ${escapeHtml(e.boughtWhere)}</div>` : ''}
